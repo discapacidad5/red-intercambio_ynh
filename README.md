@@ -15,6 +15,8 @@
 
 ## Installing on YunoHost
 
+[![Install Red de Intercambio Federada with YunoHost](https://install-app.yunohost.org/install-with-yunohost.svg)](#from-the-yunohost-webadmin-recommended)
+
 ### From the YunoHost Webadmin (recommended)
 
 1. Open your webadmin → **Applications → + Install**.

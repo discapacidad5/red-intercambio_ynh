@@ -26,7 +26,7 @@ _setup_app_sources() {
         # Si se instala desde la carpeta yunohost/ o un repositorio _ynh separado, clonar el repo principal
         local tmp_clone
         tmp_clone=$(mktemp -d)
-        git clone --depth 1 "$UPSTREAM_REPO" "$tmp_clone"
+        git clone --branch version-1 --depth 1 "$UPSTREAM_REPO" "$tmp_clone"
         for item in cmd internal web firmware go.mod go.sum LICENSE config.demo.yaml config.satellite.yaml; do
             if [ -e "$tmp_clone/$item" ]; then
                 rm -rf "$install_dir/$item"

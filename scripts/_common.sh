@@ -24,17 +24,22 @@ _setup_app_sources() {
         fi
     else
         # Si se instala desde la carpeta yunohost/ o un repositorio _ynh separado, clonar el repo principal.
-        # Sparse-checkout: solo descarga cmd/internal/web — el repo incluye el
-        # proyecto Android (punto-de-venta-pos, ~240MB) que el servidor no usa.
-        local tmp_clone
-        tmp_clone=$(mktemp -d)
+        # Limpiar restos de intentos anteriores — los clones abortados dejan
+        # basura en /tmp y el siguiente muere por espacio.
+        rm -rf /tmp/tmp.* "$data_dir/.upstream_clone" 2>/dev/null
+        # Clonar en $data_dir (disco persistente con espacio) — /tmp suele ser
+        # tmpfs chico en YunoHost y el clone de ~240MB puede morir ahí.
+        local tmp_clone="$data_dir/.upstream_clone"
+        mkdir -p "$tmp_clone"
         # Sparse-checkout rápido si el git lo soporta; si falla, clone normal
         if ! git clone --depth 1 --filter=blob:none --sparse "$UPSTREAM_REPO" "$tmp_clone" 2>/dev/null \
            || ! git -C "$tmp_clone" sparse-checkout set cmd internal web firmware go.mod go.sum LICENSE config.demo.yaml config.satellite.yaml 2>/dev/null; then
             ynh_print_warn "Sparse checkout no soportado — clonando completo"
             ynh_safe_rm "$tmp_clone"
-            tmp_clone=$(mktemp -d)
-            git clone --depth 1 "$UPSTREAM_REPO" "$tmp_clone"
+            mkdir -p "$tmp_clone"
+            # Bajar RAM del clone: limitar threads/memoria de pack
+            git clone --depth 1 -c core.packedGitLimit=128m -c core.packedGitWindowSize=16m -c pack.windowMemory=16m "$UPSTREAM_REPO" "$tmp_clone" \
+                || ynh_die "No se pudo clonar $UPSTREAM_REPO — revisa espacio en disco (df -h) y conectividad a GitHub"
         fi
         for item in cmd internal web firmware go.mod go.sum LICENSE config.demo.yaml config.satellite.yaml; do
             if [ -e "$tmp_clone/$item" ]; then

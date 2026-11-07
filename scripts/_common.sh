@@ -23,10 +23,13 @@ _setup_app_sources() {
             echo "yunohost" > "$install_dir/BUILD_COMMIT"
         fi
     else
-        # Si se instala desde la carpeta yunohost/ o un repositorio _ynh separado, clonar el repo principal
+        # Si se instala desde la carpeta yunohost/ o un repositorio _ynh separado, clonar el repo principal.
+        # Sparse-checkout: solo descarga cmd/internal/web — el repo incluye el
+        # proyecto Android (punto-de-venta-pos, ~240MB) que el servidor no usa.
         local tmp_clone
         tmp_clone=$(mktemp -d)
-        git clone --depth 1 "$UPSTREAM_REPO" "$tmp_clone"
+        git clone --depth 1 --filter=blob:none --sparse "$UPSTREAM_REPO" "$tmp_clone"
+        git -C "$tmp_clone" sparse-checkout set cmd internal web firmware go.mod go.sum LICENSE config.demo.yaml config.satellite.yaml
         for item in cmd internal web firmware go.mod go.sum LICENSE config.demo.yaml config.satellite.yaml; do
             if [ -e "$tmp_clone/$item" ]; then
                 rm -rf "$install_dir/$item"

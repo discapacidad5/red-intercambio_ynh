@@ -38,7 +38,10 @@ _setup_app_sources() {
         for item in punto-de-venta-pos punto-de-venta-pos-v1 .git .github; do
             ynh_safe_rm "$tmp_clone/$item"
         done
-        echo "main" > "$install_dir/BUILD_COMMIT"
+        # Commit real vía API — el tarball no trae .git
+        curl -fsSL "https://api.github.com/repos/discapacidad5/red-de-intercambio-federada/commits/main" 2>/dev/null \
+            | grep -oE '"sha": *"[a-f0-9]+"' | head -1 | grep -oE '[a-f0-9]{7}' | head -1 > "$install_dir/BUILD_COMMIT" 2>/dev/null \
+            || echo "main" > "$install_dir/BUILD_COMMIT"
         for item in cmd internal web firmware go.mod go.sum LICENSE config.demo.yaml config.satellite.yaml; do
             if [ -e "$tmp_clone/$item" ]; then
                 rm -rf "$install_dir/$item"

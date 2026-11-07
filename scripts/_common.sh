@@ -23,24 +23,22 @@ _setup_app_sources() {
             echo "yunohost" > "$install_dir/BUILD_COMMIT"
         fi
     else
-        # Si se instala desde la carpeta yunohost/ o un repositorio _ynh separado, clonar el repo principal.
-        # Limpiar restos de intentos anteriores — los clones abortados dejan
-        # basura en /tmp y el siguiente muere por espacio.
-        rm -rf /tmp/tmp.* "$data_dir/.upstream_clone" 2>/dev/null
-        # Clonar en $data_dir (disco persistente con espacio) — /tmp suele ser
-        # tmpfs chico en YunoHost y el clone de ~240MB puede morir ahí.
-        local tmp_clone="$data_dir/.upstream_clone"
+        # Si se instala desde la carpeta yunohost/ o un repositorio _ynh separado, bajar el código.
+        # TARBALL en vez de git clone: el repo pesa ~240MB y 'git clone' en
+        # servidores con poca RAM muere por OOM al resolver el pack.
+        # El tarball solo extrae el árbol — usa muchísima menos memoria.
+        local tmp_clone="$data_dir/.upstream_src"
+        ynh_safe_rm "$tmp_clone"
         mkdir -p "$tmp_clone"
-        # Sparse-checkout rápido si el git lo soporta; si falla, clone normal
-        if ! git clone --depth 1 --filter=blob:none --sparse "$UPSTREAM_REPO" "$tmp_clone" 2>/dev/null \
-           || ! git -C "$tmp_clone" sparse-checkout set cmd internal web firmware go.mod go.sum LICENSE config.demo.yaml config.satellite.yaml 2>/dev/null; then
-            ynh_print_warn "Sparse checkout no soportado — clonando completo"
-            ynh_safe_rm "$tmp_clone"
-            mkdir -p "$tmp_clone"
-            # Bajar RAM del clone: limitar threads/memoria de pack
-            git clone --depth 1 -c core.packedGitLimit=128m -c core.packedGitWindowSize=16m -c pack.windowMemory=16m "$UPSTREAM_REPO" "$tmp_clone" \
-                || ynh_die "No se pudo clonar $UPSTREAM_REPO — revisa espacio en disco (df -h) y conectividad a GitHub"
-        fi
+        ynh_print_warn "Descargando código fuente (tarball)..."
+        curl -fsSL "https://github.com/discapacidad5/red-de-intercambio-federada/archive/refs/heads/main.tar.gz" \
+            | tar xz -C "$tmp_clone" --strip-components=1 \
+            || ynh_die "No se pudo descargar el código — revisa conectividad a GitHub"
+        # El tarball trae todo — quedarnos solo con lo del servidor
+        for item in punto-de-venta-pos punto-de-venta-pos-v1 .git .github; do
+            ynh_safe_rm "$tmp_clone/$item"
+        done
+        echo "main" > "$install_dir/BUILD_COMMIT"
         for item in cmd internal web firmware go.mod go.sum LICENSE config.demo.yaml config.satellite.yaml; do
             if [ -e "$tmp_clone/$item" ]; then
                 rm -rf "$install_dir/$item"

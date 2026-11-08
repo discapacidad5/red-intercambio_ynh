@@ -30,25 +30,32 @@ _setup_app_sources() {
         local tmp_clone="$data_dir/.upstream_src"
         ynh_safe_rm "$tmp_clone"
         mkdir -p "$tmp_clone"
-        ynh_print_warn "Descargando código fuente (tarball)..."
-        curl -fsSL "https://github.com/discapacidad5/red-de-intercambio-federada/archive/refs/heads/main.tar.gz" \
+        # Obtener el SHA exacto del último commit vía git ls-remote (sin caché de CDN)
+        local latest_sha
+        latest_sha=$(git ls-remote "$UPSTREAM_REPO" refs/heads/main 2>/dev/null | awk '{print $1}')
+        local tarball_url="https://github.com/discapacidad5/red-de-intercambio-federada/archive/refs/heads/main.tar.gz"
+        if [ -n "$latest_sha" ]; then
+            tarball_url="https://github.com/discapacidad5/red-de-intercambio-federada/archive/${latest_sha}.tar.gz"
+        fi
+        ynh_print_warn "Descargando código fuente (tarball ${latest_sha:0:7})..."
+        curl -fsSL "$tarball_url" \
             | tar xz -C "$tmp_clone" --strip-components=1 \
             || ynh_die "No se pudo descargar el código — revisa conectividad a GitHub"
         # El tarball trae todo — quedarnos solo con lo del servidor
         for item in punto-de-venta-pos punto-de-venta-pos-v1 .git .github; do
             ynh_safe_rm "$tmp_clone/$item"
         done
-        # Commit real vía API — el tarball no trae .git
-        curl -fsSL "https://api.github.com/repos/discapacidad5/red-de-intercambio-federada/commits/main" 2>/dev/null \
-            | grep -oE '"sha": *"[a-f0-9]+"' | head -1 | grep -oE '[a-f0-9]{7}' | head -1 > "$install_dir/BUILD_COMMIT" 2>/dev/null \
-            || echo "main" > "$install_dir/BUILD_COMMIT"
         for item in cmd internal web firmware go.mod go.sum LICENSE config.demo.yaml config.satellite.yaml; do
             if [ -e "$tmp_clone/$item" ]; then
                 rm -rf "$install_dir/$item"
                 cp -a "$tmp_clone/$item" "$install_dir/$item"
             fi
         done
-        git -C "$tmp_clone" rev-parse --short HEAD > "$install_dir/BUILD_COMMIT" 2>/dev/null || echo "yunohost" > "$install_dir/BUILD_COMMIT"
+        if [ -n "$latest_sha" ]; then
+            echo "${latest_sha:0:7}" > "$install_dir/BUILD_COMMIT"
+        else
+            echo "main" > "$install_dir/BUILD_COMMIT"
+        fi
         ynh_safe_rm "$tmp_clone"
     fi
 
